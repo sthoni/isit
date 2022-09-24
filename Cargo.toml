@@ -1,0 +1,15 @@
+[package]
+name = "isit"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chbs = "0.1.1"
+clap = { version = "3.2.21", features = ["derive"] }
+csv = "1.1.6"
+encoding_rs = "0.8.31"
+encoding_rs_io = "0.1.7"
+glob = "0.3.0"
+serde = { version = "1.0.144", features = ["derive"] }
