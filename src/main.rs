@@ -11,6 +11,9 @@ use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 
+#[macro_use]
+extern crate log;
+
 // Idee:
 // Für alle möglichen csv-Formate gibt es passende structs.
 // Per CLI-Argumente teilt man dem Programm mit, welche es verarbeiten soll.
@@ -111,7 +114,18 @@ impl RecordIserv {
 
 impl From<RecordSchild> for RecordIserv {
     fn from(record: RecordSchild) -> Self {
-        RecordIserv::new(record.nachname, record.vorname, record.gruppe, record.guid)
+        let klasse: String;
+        // TODO Ab Schuljahr 2023/24 muss 10 entfernt und 13 hinzugefügt werden.
+        if record.gruppe.starts_with("10") {
+            klasse = "10".to_string();
+        } else if record.gruppe.starts_with("11") {
+            klasse = "11".to_string();
+        } else if record.gruppe.starts_with("12") {
+            klasse = "12".to_string();
+        } else {
+            klasse = record.gruppe
+        };
+        RecordIserv::new(record.nachname, record.vorname, klasse, record.guid)
     }
 }
 
@@ -134,6 +148,7 @@ impl From<Record> for RecordIserv {
 }
 
 fn main() {
+    env_logger::init();
     let args = Args::parse();
     let paths = get_all_csv_paths(&args.dirpath).unwrap();
     let records = get_all_csv_records_in_dir(paths, args.record_type, args.encoding);
@@ -181,6 +196,7 @@ fn get_all_csv_records_in_dir(
             Err(e) => println!("{:?}", e),
         }
     }
+    debug!("Test");
     Ok(records)
 }
 
