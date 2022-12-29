@@ -43,13 +43,13 @@ enum Encoding {
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    #[clap(short, long, value_parser)]
+    #[clap(default_value = ".", short, long, value_parser)]
     dirpath: String,
-    #[clap(short, long, value_parser)]
+    #[clap(default_value = "./export", short, long, value_parser)]
     outputpath: String,
     #[clap(short, long, arg_enum, value_parser)]
     record_type: RecordType,
-    #[clap(default_value_t = Encoding::Utf8, short, arg_enum, long, value_parser)]
+    #[clap(default_value_t = Encoding::Windows, short, arg_enum, long, value_parser)]
     encoding: Encoding,
 }
 
@@ -98,7 +98,7 @@ impl RecordIserv {
                 .collect::<Vec<String>>(),
         )
         .sampler();
-        config.separator = " ".into();
+        config.separator = "-".into();
         config.capitalize_first = Probability::Never;
         let scheme = config.to_scheme();
         let password = scheme.generate();
