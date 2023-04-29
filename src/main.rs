@@ -1,7 +1,7 @@
-use chbs::config::{self, BasicConfig};
+use chbs::config::BasicConfig;
 use chbs::probability::Probability;
 use chbs::scheme::ToScheme;
-use chbs::word::{WordList, WordSampler};
+use chbs::word::WordList;
 use clap::{Parser, ValueEnum};
 use encoding_rs::{UTF_8, WINDOWS_1252};
 use encoding_rs_io::DecodeReaderBytesBuilder;
@@ -53,6 +53,9 @@ struct Args {
     encoding: Encoding,
 }
 
+// TODO Gruppe oder Klasse in Quelle?
+// TODO Direkt xls
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct RecordSchild {
@@ -90,7 +93,7 @@ struct RecordIserv {
 impl RecordIserv {
     fn new(nachname: String, vorname: String, klasse: String, import_id: String) -> Self {
         let mut config = BasicConfig::default();
-        config.words = 3;
+        config.words = 2;
         config.word_provider = WordList::new(
             WORDLIST
                 .lines()
@@ -241,6 +244,8 @@ fn print_records_from_file(records: &Vec<Record>) {
         println!("{:?}", record);
     }
 }
+
+// TODO Export Datei in import-ready oder so umbenennen
 
 fn write_records_to_file(records: &Vec<RecordIserv>) -> Result<(), Box<dyn Error>> {
     let mut wtr = csv::WriterBuilder::new()
