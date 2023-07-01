@@ -45,7 +45,7 @@ enum Encoding {
 struct Args {
     #[clap(default_value = ".", short, long, value_parser)]
     dirpath: String,
-    #[clap(default_value = "./export", short, long, value_parser)]
+    #[clap(default_value = "./import-ready", short, long, value_parser)]
     outputpath: String,
     #[clap(short, long, arg_enum, value_parser)]
     record_type: RecordType,
@@ -118,13 +118,14 @@ impl RecordIserv {
 impl From<RecordSchild> for RecordIserv {
     fn from(record: RecordSchild) -> Self {
         let klasse: String;
-        // TODO Ab Schuljahr 2023/24 muss 10 entfernt und 13 hinzugefügt werden.
         if record.gruppe.starts_with("10") {
             klasse = "10".to_string();
         } else if record.gruppe.starts_with("11") {
             klasse = "11".to_string();
         } else if record.gruppe.starts_with("12") {
             klasse = "12".to_string();
+        } else if record.gruppe.starts_with("13") {
+            klasse = "13".to_string();
         } else {
             klasse = record.gruppe
         };
@@ -245,12 +246,10 @@ fn print_records_from_file(records: &Vec<Record>) {
     }
 }
 
-// TODO Export Datei in import-ready oder so umbenennen
-
 fn write_records_to_file(records: &Vec<RecordIserv>) -> Result<(), Box<dyn Error>> {
     let mut wtr = csv::WriterBuilder::new()
         .delimiter(b';')
-        .from_path("./export.csv")?;
+        .from_path("./import_iserv_ready.csv")?;
     for record in records {
         wtr.serialize(record)?;
     }
