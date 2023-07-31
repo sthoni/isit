@@ -1,3 +1,4 @@
+use calamine::{open_workbook, Reader, Xlsx};
 use chbs::config::BasicConfig;
 use chbs::probability::Probability;
 use chbs::scheme::ToScheme;
@@ -35,6 +36,11 @@ enum RecordType {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum FileType {
+    Csv,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum Encoding {
     Utf8,
     Windows,
@@ -49,6 +55,8 @@ struct Args {
     outputpath: String,
     #[clap(short, long, arg_enum, value_parser)]
     record_type: RecordType,
+    #[clap(short, long, arg_enum, value_parser)]
+    file_type: FileType,
     #[clap(default_value_t = Encoding::Windows, short, arg_enum, long, value_parser)]
     encoding: Encoding,
 }
@@ -154,8 +162,13 @@ impl From<Record> for RecordIserv {
 fn main() {
     env_logger::init();
     let args = Args::parse();
-    let paths = get_all_csv_paths(&args.dirpath).unwrap();
-    let records = get_all_csv_records_in_dir(paths, args.record_type, args.encoding);
+    let mut records: Result<Vec<Record>, _>;
+    match args.file_type {
+        FileType::Csv => {
+            let paths = get_all_csv_paths(&args.dirpath).unwrap();
+            records = get_all_csv_records_in_dir(paths, args.record_type, args.encoding);
+        }
+    }
     match records {
         Ok(r) => {
             let records_iserv = &r.into_iter().map(|r| r.into()).collect();
@@ -202,6 +215,19 @@ fn get_all_csv_records_in_dir(
     }
     debug!("Test");
     Ok(records)
+}
+
+fn get_all_xlsx_records_in_dir(
+    paths: Vec<PathBuf>,
+    record_type: RecordType,
+) -> Result<Vec<Record>, GlobError> {
+    let mut records: Vec<Record> = Vec::new();
+    for path in paths {
+        let mut workbook: Xlsx<_> = open_workbook(path).expect("Cannot open file");
+        let sheets = workbook.sheet_names().to_owned();
+        let range = workbook.worksheet_range(&sheets[0]);
+    }
+    records
 }
 
 fn get_all_csv_records_in_file(

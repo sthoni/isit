@@ -15,3 +15,4 @@ glob = "0.3.0"
 serde = { version = "1.0.144", features = ["derive"] }
 log = "0.4.0"
 env_logger = "0.9.0"
+calamine = "0.21.2"
