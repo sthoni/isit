@@ -227,7 +227,6 @@ fn get_all_csv_records_in_dir(
             Err(e) => println!("{:?}", e),
         }
     }
-    debug!("Test");
     Ok(records)
 }
 
