@@ -1,4 +1,4 @@
-use calamine::{open_workbook, Reader, Xlsx};
+use calamine::{open_workbook, Error, RangeDeserializerBuilder, Reader, Xlsx};
 use chbs::config::BasicConfig;
 use chbs::probability::Probability;
 use chbs::scheme::ToScheme;
@@ -6,9 +6,9 @@ use chbs::word::WordList;
 use clap::{Parser, ValueEnum};
 use encoding_rs::{UTF_8, WINDOWS_1252};
 use encoding_rs_io::DecodeReaderBytesBuilder;
-use glob::{glob, GlobError};
+use glob::glob;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
+use std::error::Error as OtherError;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -38,6 +38,7 @@ enum RecordType {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum FileType {
     Csv,
+    Excel,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -78,13 +79,9 @@ struct RecordSchild {
 struct RecordGastschueler {
     #[serde(rename = "NAME, VORNAME")]
     name: String,
-    stammschule: String,
-    note: String,
     klasse: String,
     #[serde(rename = "SCHÜLERNR")]
     schuelernr: String,
-    #[serde(rename = "FACHKÜRZEL")]
-    fachkuerzel: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -162,11 +159,15 @@ impl From<Record> for RecordIserv {
 fn main() {
     env_logger::init();
     let args = Args::parse();
-    let mut records: Result<Vec<Record>, _>;
+    let records: Result<Vec<Record>, _>;
     match args.file_type {
         FileType::Csv => {
             let paths = get_all_csv_paths(&args.dirpath).unwrap();
             records = get_all_csv_records_in_dir(paths, args.record_type, args.encoding);
+        }
+        FileType::Excel => {
+            let paths = get_all_xlsx_paths(&args.dirpath).unwrap();
+            records = get_all_xlsx_records_in_dir(paths, args.record_type)
         }
     }
     match records {
@@ -181,7 +182,20 @@ fn main() {
     }
 }
 
-fn get_all_csv_paths(dirpath: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+fn get_all_xlsx_paths(dirpath: &str) -> Result<Vec<PathBuf>, Box<dyn OtherError>> {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    let pattern = format!("{}{}", dirpath, "/*.xlsx");
+    let paths_glob = glob(&pattern).unwrap();
+    for path in paths_glob {
+        match path {
+            Ok(p) => paths.push(p),
+            Err(e) => println!("{:?}", e),
+        }
+    }
+    Ok(paths)
+}
+
+fn get_all_csv_paths(dirpath: &str) -> Result<Vec<PathBuf>, Box<dyn OtherError>> {
     let mut paths: Vec<PathBuf> = Vec::new();
     let pattern = format!("{}{}", dirpath, "/*.CSV");
     let paths_glob = glob(&pattern).unwrap();
@@ -198,7 +212,7 @@ fn get_all_csv_records_in_dir(
     paths: Vec<PathBuf>,
     record_type: RecordType,
     encoding: Encoding,
-) -> Result<Vec<Record>, GlobError> {
+) -> Result<Vec<Record>, Box<dyn OtherError>> {
     let mut records: Vec<Record> = Vec::new();
     for path in paths {
         let path_unwrapped = path;
@@ -220,21 +234,42 @@ fn get_all_csv_records_in_dir(
 fn get_all_xlsx_records_in_dir(
     paths: Vec<PathBuf>,
     record_type: RecordType,
-) -> Result<Vec<Record>, GlobError> {
+) -> Result<Vec<Record>, Box<dyn OtherError>> {
     let mut records: Vec<Record> = Vec::new();
     for path in paths {
-        let mut workbook: Xlsx<_> = open_workbook(path).expect("Cannot open file");
+        let mut workbook: Xlsx<_> = open_workbook(path)?;
         let sheets = workbook.sheet_names().to_owned();
-        let range = workbook.worksheet_range(&sheets[0]);
+        let range = workbook
+            .worksheet_range(&sheets[0])
+            .ok_or(Error::Msg("Cannot find 'Sheet1'"))??;
+        let iter = RangeDeserializerBuilder::new().from_range(&range)?;
+        for row in iter {
+            let record: RecordSchild = row?;
+            records.push(Record::RecordSchild(record));
+        }
+        /*         match record_type {
+            RecordType::Schild => {
+                for row in iter {
+                    let record: RecordSchild = row?;
+                    records.push(Record::RecordSchild(record));
+                }
+            }
+            RecordType::Gastschueler => {
+                for row in iter {
+                    let record: RecordGastschueler = row?;
+                    records.push(Record::RecordGastschueler(record));
+                }
+            }
+        }; */
     }
-    records
+    Ok(records)
 }
 
 fn get_all_csv_records_in_file(
     file: File,
     record_type: RecordType,
     encoding: Encoding,
-) -> Result<Vec<Record>, Box<dyn Error>> {
+) -> Result<Vec<Record>, Box<dyn OtherError>> {
     let mut records: Vec<Record> = Vec::new();
     let win_reader = match encoding {
         Encoding::Utf8 => DecodeReaderBytesBuilder::new()
@@ -266,13 +301,7 @@ fn get_all_csv_records_in_file(
     Ok(records)
 }
 
-fn print_records_from_file(records: &Vec<Record>) {
-    for record in records {
-        println!("{:?}", record);
-    }
-}
-
-fn write_records_to_file(records: &Vec<RecordIserv>) -> Result<(), Box<dyn Error>> {
+fn write_records_to_file(records: &Vec<RecordIserv>) -> Result<(), Box<dyn OtherError>> {
     let mut wtr = csv::WriterBuilder::new()
         .delimiter(b';')
         .from_path("./import_iserv_ready.csv")?;
