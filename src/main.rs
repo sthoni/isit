@@ -12,8 +12,7 @@ use std::error::Error as OtherError;
 use std::fs::File;
 use std::path::PathBuf;
 
-#[macro_use]
-extern crate log;
+use log::info;
 
 // Idee:
 // Für alle möglichen csv-Formate gibt es passende structs.
@@ -63,7 +62,6 @@ struct Args {
 }
 
 // TODO Gruppe oder Klasse in Quelle?
-// TODO Direkt xls
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -158,6 +156,7 @@ impl From<Record> for RecordIserv {
 
 fn main() {
     env_logger::init();
+    info!("Programm gestartet.");
     let args = Args::parse();
     let records: Result<Vec<Record>, _>;
     match args.file_type {
@@ -243,19 +242,19 @@ fn get_all_xlsx_records_in_dir(
             .ok_or(Error::Msg("Cannot find 'Sheet1'"))??;
         let iter = RangeDeserializerBuilder::new().from_range(&range)?;
         for row in iter {
-            let record: RecordSchild = row?;
+            let record = row?;
             records.push(Record::RecordSchild(record));
         }
-        /*         match record_type {
+        /* match record_type {
             RecordType::Schild => {
                 for row in iter {
-                    let record: RecordSchild = row?;
+                    let record = row?;
                     records.push(Record::RecordSchild(record));
                 }
             }
             RecordType::Gastschueler => {
                 for row in iter {
-                    let record: RecordGastschueler = row?;
+                    let record = row?;
                     records.push(Record::RecordGastschueler(record));
                 }
             }
