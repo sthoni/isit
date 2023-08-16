@@ -11,12 +11,12 @@ use std::error::Error as OtherError;
 use std::fs::File;
 use std::path::PathBuf;
 
-use log::info;
+use log::{error, info};
 
 // Idee:
 // Für alle möglichen csv-Formate gibt es passende structs.
 // Per CLI-Argumente teilt man dem Programm mit, welche es verarbeiten soll.
-// Es können Passwörter generiert werden.
+// Es werden Passwörter generiert werden.
 // Am Ende wird eine csv-Datei erstellt, die für IServ gedacht ist.
 
 pub const WORDLIST: &str = include_str!("../res/words.txt");
@@ -156,15 +156,16 @@ fn main() {
     let args = Args::parse();
     let records: Result<Vec<Record>, _>;
     let path = PathBuf::from(args.file_path);
+    info!("Öffne nun Datei.");
     match args.file_type {
         FileType::Csv => {
-            let file = File::open(path).unwrap();
-            records = get_all_csv_records_in_file(file, args.record_type, args.encoding);
+            records = get_all_csv_records_in_file(path, args.record_type, args.encoding);
         }
         FileType::Excel => {
             records = get_all_xlsx_records_in_file(path, args.record_type);
         }
     }
+    info!("Schreibe in Datei.");
     match records {
         Ok(r) => {
             let records_iserv = &r.into_iter().map(|r| r.into()).collect();
@@ -175,6 +176,7 @@ fn main() {
         }
         Err(e) => println!("{:?}", e),
     }
+    info!("Beende das Programm.");
 }
 
 fn get_all_xlsx_records_in_file(
@@ -183,24 +185,40 @@ fn get_all_xlsx_records_in_file(
 ) -> Result<Vec<Record>, Box<dyn OtherError>> {
     let mut records: Vec<Record> = Vec::new();
     let mut workbook: Xlsx<_> = open_workbook(path)?;
+    info!("Excel-Datei geöffnet.");
     let sheets = workbook.sheet_names().to_owned();
     let range = workbook
         .worksheet_range(&sheets[0])
         .ok_or(Error::Msg("Cannot find 'Sheet1'"))??;
-    let iter = RangeDeserializerBuilder::new().from_range(&range)?;
-    for row in iter {
-        let record = row?;
-        records.push(Record::RecordSchild(record));
+    match record_type {
+        RecordType::Schild => {
+            let iter = RangeDeserializerBuilder::new().from_range(&range)?;
+            for row in iter {
+                let record = row?;
+                records.push(Record::RecordSchild(record));
+            }
+        }
+        RecordType::Gastschueler => {
+            let iter = RangeDeserializerBuilder::new().from_range(&range)?;
+            for row in iter {
+                let record = row?;
+                records.push(Record::RecordGastschueler(record));
+            }
+        }
     }
+
     Ok(records)
 }
 
 fn get_all_csv_records_in_file(
-    file: File,
+    path: PathBuf,
     record_type: RecordType,
     encoding: Encoding,
 ) -> Result<Vec<Record>, Box<dyn OtherError>> {
+    let file = File::open(path).unwrap();
+    info!("CSV-Datei geöffnet.");
     let mut records: Vec<Record> = Vec::new();
+    info!("Checke Encoding.");
     let win_reader = match encoding {
         Encoding::Utf8 => DecodeReaderBytesBuilder::new()
             .encoding(Some(UTF_8))
