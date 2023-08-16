@@ -6,7 +6,6 @@ use chbs::word::WordList;
 use clap::{Parser, ValueEnum};
 use encoding_rs::{UTF_8, WINDOWS_1252};
 use encoding_rs_io::DecodeReaderBytesBuilder;
-use glob::glob;
 use serde::{Deserialize, Serialize};
 use std::error::Error as OtherError;
 use std::fs::File;
@@ -49,19 +48,17 @@ enum Encoding {
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    #[clap(default_value = ".", short, long, value_parser)]
-    dirpath: String,
-    #[clap(default_value = "./import-ready", short, long, value_parser)]
-    outputpath: String,
+    #[clap(short, long, value_parser)]
+    file_path: String,
+    #[clap(default_value = "./import_iserv_ready.csv", short, long, value_parser)]
+    output_path: String,
     #[clap(default_value_t = RecordType::Schild ,short, long, arg_enum, value_parser)]
     record_type: RecordType,
-    #[clap(default_value_t = FileType::Csv, short, long, arg_enum, value_parser)]
+    #[clap(default_value_t = FileType::Csv, short = 't', long, arg_enum, value_parser)]
     file_type: FileType,
     #[clap(default_value_t = Encoding::Utf8, short, arg_enum, long, value_parser)]
     encoding: Encoding,
 }
-
-// TODO Gruppe oder Klasse in Quelle?
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -158,20 +155,20 @@ fn main() {
     info!("Programm gestartet.");
     let args = Args::parse();
     let records: Result<Vec<Record>, _>;
+    let path = PathBuf::from(args.file_path);
     match args.file_type {
         FileType::Csv => {
-            let paths = get_all_csv_paths(&args.dirpath).unwrap();
-            records = get_all_csv_records_in_dir(paths, args.record_type, args.encoding);
+            let file = File::open(path).unwrap();
+            records = get_all_csv_records_in_file(file, args.record_type, args.encoding);
         }
         FileType::Excel => {
-            let paths = get_all_xlsx_paths(&args.dirpath).unwrap();
-            records = get_all_xlsx_records_in_dir(paths, args.record_type)
+            records = get_all_xlsx_records_in_file(path, args.record_type);
         }
     }
     match records {
         Ok(r) => {
             let records_iserv = &r.into_iter().map(|r| r.into()).collect();
-            match write_records_to_file(records_iserv) {
+            match write_records_to_file(records_iserv, args.output_path) {
                 Ok(_) => (),
                 Err(e) => println!("{:?}", e),
             };
@@ -180,84 +177,20 @@ fn main() {
     }
 }
 
-fn get_all_xlsx_paths(dirpath: &str) -> Result<Vec<PathBuf>, Box<dyn OtherError>> {
-    let mut paths: Vec<PathBuf> = Vec::new();
-    let pattern = format!("{}{}", dirpath, "/*.xlsx");
-    let paths_glob = glob(&pattern).unwrap();
-    for path in paths_glob {
-        match path {
-            Ok(p) => paths.push(p),
-            Err(e) => println!("{:?}", e),
-        }
-    }
-    Ok(paths)
-}
-
-fn get_all_csv_paths(dirpath: &str) -> Result<Vec<PathBuf>, Box<dyn OtherError>> {
-    let mut paths: Vec<PathBuf> = Vec::new();
-    let pattern = format!("{}{}", dirpath, "/*.CSV");
-    let paths_glob = glob(&pattern).unwrap();
-    for path in paths_glob {
-        match path {
-            Ok(p) => paths.push(p),
-            Err(e) => println!("{:?}", e),
-        }
-    }
-    Ok(paths)
-}
-
-fn get_all_csv_records_in_dir(
-    paths: Vec<PathBuf>,
-    record_type: RecordType,
-    encoding: Encoding,
-) -> Result<Vec<Record>, Box<dyn OtherError>> {
-    let mut records: Vec<Record> = Vec::new();
-    for path in paths {
-        let path_unwrapped = path;
-        let file = File::open(path_unwrapped).unwrap();
-        let records_file = get_all_csv_records_in_file(file, record_type, encoding);
-        match records_file {
-            Ok(rs) => {
-                for record in rs {
-                    records.push(record);
-                }
-            }
-            Err(e) => println!("{:?}", e),
-        }
-    }
-    Ok(records)
-}
-
-fn get_all_xlsx_records_in_dir(
-    paths: Vec<PathBuf>,
+fn get_all_xlsx_records_in_file(
+    path: PathBuf,
     record_type: RecordType,
 ) -> Result<Vec<Record>, Box<dyn OtherError>> {
     let mut records: Vec<Record> = Vec::new();
-    for path in paths {
-        let mut workbook: Xlsx<_> = open_workbook(path)?;
-        let sheets = workbook.sheet_names().to_owned();
-        let range = workbook
-            .worksheet_range(&sheets[0])
-            .ok_or(Error::Msg("Cannot find 'Sheet1'"))??;
-        let iter = RangeDeserializerBuilder::new().from_range(&range)?;
-        for row in iter {
-            let record = row?;
-            records.push(Record::RecordSchild(record));
-        }
-        /* match record_type {
-            RecordType::Schild => {
-                for row in iter {
-                    let record = row?;
-                    records.push(Record::RecordSchild(record));
-                }
-            }
-            RecordType::Gastschueler => {
-                for row in iter {
-                    let record = row?;
-                    records.push(Record::RecordGastschueler(record));
-                }
-            }
-        }; */
+    let mut workbook: Xlsx<_> = open_workbook(path)?;
+    let sheets = workbook.sheet_names().to_owned();
+    let range = workbook
+        .worksheet_range(&sheets[0])
+        .ok_or(Error::Msg("Cannot find 'Sheet1'"))??;
+    let iter = RangeDeserializerBuilder::new().from_range(&range)?;
+    for row in iter {
+        let record = row?;
+        records.push(Record::RecordSchild(record));
     }
     Ok(records)
 }
@@ -298,10 +231,11 @@ fn get_all_csv_records_in_file(
     Ok(records)
 }
 
-fn write_records_to_file(records: &Vec<RecordIserv>) -> Result<(), Box<dyn OtherError>> {
-    let mut wtr = csv::WriterBuilder::new()
-        .delimiter(b';')
-        .from_path("./import_iserv_ready.csv")?;
+fn write_records_to_file(
+    records: &Vec<RecordIserv>,
+    path: String,
+) -> Result<(), Box<dyn OtherError>> {
+    let mut wtr = csv::WriterBuilder::new().delimiter(b';').from_path(path)?;
     for record in records {
         wtr.serialize(record)?;
     }
