@@ -53,11 +53,11 @@ struct Args {
     dirpath: String,
     #[clap(default_value = "./import-ready", short, long, value_parser)]
     outputpath: String,
-    #[clap(short, long, arg_enum, value_parser)]
+    #[clap(default_value_t = RecordType::Schild ,short, long, arg_enum, value_parser)]
     record_type: RecordType,
-    #[clap(short, long, arg_enum, value_parser)]
+    #[clap(default_value_t = FileType::Csv, short, long, arg_enum, value_parser)]
     file_type: FileType,
-    #[clap(default_value_t = Encoding::Windows, short, arg_enum, long, value_parser)]
+    #[clap(default_value_t = Encoding::Utf8, short, arg_enum, long, value_parser)]
     encoding: Encoding,
 }
 
@@ -68,7 +68,8 @@ struct Args {
 struct RecordSchild {
     nachname: String,
     vorname: String,
-    gruppe: String,
+    klasse: String,
+    #[serde(rename = "eindeutige Nummer (GUID)")]
     guid: String,
 }
 
@@ -121,16 +122,14 @@ impl RecordIserv {
 impl From<RecordSchild> for RecordIserv {
     fn from(record: RecordSchild) -> Self {
         let klasse: String;
-        if record.gruppe.starts_with("10") {
-            klasse = "10".to_string();
-        } else if record.gruppe.starts_with("11") {
+        if record.klasse.starts_with("11") {
             klasse = "11".to_string();
-        } else if record.gruppe.starts_with("12") {
+        } else if record.klasse.starts_with("12") {
             klasse = "12".to_string();
-        } else if record.gruppe.starts_with("13") {
+        } else if record.klasse.starts_with("13") {
             klasse = "13".to_string();
         } else {
-            klasse = record.gruppe
+            klasse = record.klasse
         };
         RecordIserv::new(record.nachname, record.vorname, klasse, record.guid)
     }
