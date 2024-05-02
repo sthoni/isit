@@ -68,7 +68,6 @@ Besuch
 Betrag
 Bett
 Bewerbung
-Bier
 Bild
 Bildschirm
 Birne
@@ -78,7 +77,6 @@ Bleistift
 Blick
 Blume
 Bluse
-Blut
 Bogen
 Bohne
 Brief
@@ -517,7 +515,6 @@ Tourist
 Treppe
 Trinkgeld
 Turm
-U-Bahn
 Uhr
 Unfall
 Unterhaltung
@@ -571,7 +568,6 @@ Zeitung
 Zentrum
 Zettel
 Zeugnis
-Zigarette
 Zimmer
 Zitrone
 Zoll
